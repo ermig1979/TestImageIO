@@ -7,3 +7,6 @@
 [submodule "3rd/Cpl"]
 	path = 3rd/Cpl
 	url = https://github.com/ermig1979/Cpl.git
+[submodule "3rd/stb"]
+	path = 3rd/stb
+	url = https://github.com/nothings/stb.git

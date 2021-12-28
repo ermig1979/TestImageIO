@@ -10,6 +10,8 @@ set(REQUIRE_SIMD ON CACHE BOOL "" FORCE)
 include_directories(${3RD_DIR}/libjpeg-turbo)
 add_subdirectory(${3RD_DIR}/libjpeg-turbo libjpeg-turbo)
 
+include_directories(${3RD_DIR}/stb)
+
 set(SIMD_AVX512 ON CACHE BOOL "" FORCE)
 set(SIMD_AVX512VNNI OFF CACHE BOOL "" FORCE)
 set(SIMD_TEST OFF CACHE BOOL "" FORCE)
@@ -21,6 +23,8 @@ set(SIMD_SYNET OFF "" FORCE)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 include_directories(${3RD_DIR}/Simd/src)
 add_subdirectory(${3RD_DIR}/Simd/prj/cmake Simd)
+
+include_directories(${ROOT_DIR}/src)
 
 file(GLOB_RECURSE TEST_SRC ${ROOT_DIR}/src/TestImageIO/*.cpp)
 add_executable(TestImageIO ${TEST_SRC})
