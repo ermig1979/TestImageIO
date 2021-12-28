@@ -93,12 +93,13 @@ bool Test(const std::string& name, const int count, int quality, tjhandle jpegCo
 
 int main()
 {
-	const int N = 100, qulities[4] = {10, 35, 65, 95};
+	const int N = 100, qulities[5] = {10, 35, 65, 85, 95};
 	tjhandle jpegCompressor = tjInitCompress();
 
-	for (int i = 0; i < 4; ++i)
+	for (int i = 0; i < 5; ++i)
 	{
 		Test("city.jpg", N, qulities[i], jpegCompressor);
+		Test("face.jpg", N, qulities[i], jpegCompressor);
 		Test("forest.jpg", N, qulities[i], jpegCompressor);
 		Test("text.png", N, qulities[i], jpegCompressor);
 	}
