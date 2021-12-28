@@ -62,7 +62,7 @@ void TestTurboJpeg(tjhandle _jpegCompressor, const View& src, int quality, const
 bool Test(const std::string& name, const int count, int quality, tjhandle jpegCompressor)
 {
 	View src;
-	if (!src.Load(std::string("../image/") + name, View::Rgb24))
+	if (!src.Load(std::string("../data/image/") + name, View::Rgb24))
 	{
 		std::cout << "Can't load test image!" << std::endl;
 		return false;;
