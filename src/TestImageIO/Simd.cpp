@@ -21,52 +21,53 @@
 * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 * SOFTWARE.
 */
-#pragma once
-
-#include "Cpl/Performance.h"
-
-#include "Simd/SimdView.hpp"
+#include "TestImageIO/Common.h"
 
 namespace Test
 {
-	typedef Cpl::String String;
-
-	typedef Simd::View<Simd::Allocator> Image;
-
-	//------------------------------------------------------------------------------------------------
-
-	struct Compressed
+	class FrameworkSimd : public Framework 
 	{
-		uint8_t* data;
-		size_t size;
-
-		Compressed()
-			: data(0)
-			, size(0)
+	public:
+		virtual String Name() const
 		{
+			return "Simd";
+		}
+
+		virtual bool Save(const Image& image, int quality, Compressed& compressed)
+		{
+			compressed.data = SimdImageSaveToMemory(image.data, image.stride, image.width, image.height, 
+				(SimdPixelFormatType)image.format, SimdImageFileJpeg, quality, &compressed.size);
+
+			return compressed.data == NULL;
+		}
+
+		virtual bool Load(const Compressed& compressed, Image& image)
+		{
+			return image.Load(compressed.data, compressed.size, Image::Rgb24);
+		};
+
+		virtual bool Load(const Compressed& compressed)
+		{
+			Image image;
+
+			return Load(compressed, image);
+		};
+
+		virtual void Free(Compressed& compressed)
+		{
+			if (compressed.data)
+			{
+				SimdFree(compressed.data);
+				compressed.data = NULL;
+				compressed.size = 0;
+			}
 		}
 	};
 
 	//------------------------------------------------------------------------------------------------
 
-	class Framework
+	Framework* InitSimd()
 	{
-	public:
-		virtual ~Framework() {};
-
-		virtual String Name() const = 0;
-
-		virtual bool Save(const Image& image, int quality, Compressed & compressed) = 0;
-
-		virtual bool Load(const Compressed& compressed, Image& image) = 0;
-
-		virtual bool Load(const Compressed& compressed) = 0;
-
-		virtual void Free(Compressed& compressed) = 0;
-	};
-
-	//------------------------------------------------------------------------------------------------
-
-	Framework* InitSimd();
-	Framework* InitTurboJpeg();
+		return new FrameworkSimd();
+	}
 }
