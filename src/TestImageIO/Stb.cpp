@@ -24,95 +24,89 @@
 
 #include "TestImageIO/Common.h"
 
-#include <turbojpeg.h>
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb_image_write.h>
 
 namespace Test
 {
-	class FrameworkTurboJpeg : public Framework 
+	class FrameworkStb : public Framework 
 	{
-		tjhandle _jpegEncoder, _jpegDecoder;
+		struct WriteContext
+		{
+			size_t capacity;
+			Compressed &compressed;
+
+			WriteContext(Compressed& compressed_)
+				: compressed(compressed_)
+				, capacity(compressed_.size)
+			{
+			}
+		};
+
+		static void WriteFunc(void* context, void* data, int size)
+		{
+			WriteContext* wc = (WriteContext*)context;
+			if (wc->compressed.size + size > wc->capacity)
+			{
+				wc->capacity = wc->compressed.size + std::max<size_t>(size, wc->compressed.size);
+				wc->compressed.data = (uint8_t*)realloc(wc->compressed.data, wc->capacity);
+			}
+			const uint8_t* src = (uint8_t*)data;
+			uint8_t* dst = wc->compressed.data;
+			for (size_t i = 0; i < size; ++i)
+				dst[i] = src[i];
+			wc->compressed.size += size;
+		}
 
 	public:
-		FrameworkTurboJpeg()
-			: _jpegEncoder(NULL)
-			, _jpegDecoder(NULL)
-		{
-			_jpegEncoder = tjInitCompress();
-
-			_jpegDecoder = tjInitDecompress();
-		}
-
-		virtual ~FrameworkTurboJpeg()
-		{
-			if(_jpegEncoder)
-			{ 
-				int error = tjDestroy(_jpegEncoder);
-				_jpegEncoder = NULL;
-			}
-			if (_jpegDecoder)
-			{
-				int error = tjDestroy(_jpegDecoder);
-				_jpegDecoder = NULL;
-			}
-		}
-
 		virtual String Name() const
 		{
-			return "TurboJpeg";
+			return "Stb";
 		}
 
 		virtual bool Save(const Image& image, int quality, Compressed& compressed)
 		{
-			long unsigned int size = 0;
+			WriteContext context(compressed);
 
-			int error = tjCompress2(_jpegEncoder, image.data, (int)image.width, (int)image.stride, (int)image.height, 
-				TJPF_RGB, &compressed.data, &size, quality <= 90 ? TJSAMP_420 : TJSAMP_444, quality, TJFLAG_FASTDCT);
-
-			if (error)
-			{
-				return false;
-			}
-			else
-			{
-				compressed.size = (size_t)size;
-				return true;
-			}
+			return stbi_write_jpg_to_func(WriteFunc, &context, (int)image.width, (int)image.height, 3, image.data, quality) != 0;
 		}
 
 		virtual bool Load(const Compressed& compressed, Image& image)
 		{
-			int width, height, subSample, colorSpace;
-			int error = tjDecompressHeader3(_jpegDecoder, compressed.data, compressed.size, 
-				&width, &height, &subSample, &colorSpace);
-			if (error)
+			int x, y, c;
+			stbi_uc* data = stbi_load_from_memory(compressed.data, compressed.size, &x, &y, &c, STBI_rgb);
+			if (data)
 			{
-				return false;
+				image.Recreate(x, y, Image::Rgb24);
+				Simd::Copy(Image(x, y, x * c, Image::Rgb24, data), image);
+				stbi_image_free(data);
+				return true;
 			}
-
-			image.Recreate(width, height, Image::Rgb24);
-
-			error = tjDecompress2(_jpegDecoder, compressed.data, compressed.size, 
-				image.data, image.width, image.stride, image.height, TJPF_RGB, TJFLAG_FASTDCT);
-			if (error)
-			{
+			else
 				return false;
-			}
-
-			return true;
 		};
 
 		virtual bool Load(const Compressed& compressed)
 		{
-			Image image;
-
-			return Load(compressed, image);
+			int x, y, c;
+			stbi_uc* data = stbi_load_from_memory(compressed.data, compressed.size, &x, &y, &c, STBI_rgb);
+			if (data)
+			{
+				stbi_image_free(data);
+				return true;
+			}
+			else
+				return false;
 		};
 
 		virtual void Free(Compressed& compressed)
 		{
 			if (compressed.data)
 			{
-				tjFree(compressed.data);
+				free(compressed.data);
 				compressed.data = NULL;
 				compressed.size = 0;
 			}
@@ -121,8 +115,8 @@ namespace Test
 
 	//------------------------------------------------------------------------------------------------
 
-	Framework* InitTurboJpeg()
+	Framework* InitStb()
 	{
-		return new FrameworkTurboJpeg();
+		return new FrameworkStb();
 	}
 }

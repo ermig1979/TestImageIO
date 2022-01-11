@@ -1,7 +1,7 @@
 /*
 * Test Image IO Project (http://github.com/ermig1979/TestImageIO).
 *
-* Copyright (c) 2021-2021 Yermalayeu Ihar.
+* Copyright (c) 2021-2022 Yermalayeu Ihar.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -23,60 +23,9 @@
 */
 #include "TestImageIO/Common.h"
 
-#include <turbojpeg.h>
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#include <stb_image_write.h>
-
 namespace Test
 {
-	void TestSimd(const Image& src, int quality)
-	{
-		uint8_t* data = NULL;
-		size_t size = 0;
-
-		data = SimdImageSaveToMemory(src.data, src.stride, src.width, src.height, (SimdPixelFormatType)src.format, SimdImageFileJpeg, quality, &size);
-
-		if (data)
-			SimdFree(data);
-		else
-			std::cout << "Simd can't save image to memory!" << std::endl;
-	}
-
-	void TestTurboJpeg(tjhandle _jpegCompressor, const Image& src, int quality, const String& name)
-	{
-		long unsigned int _jpegSize = 0;
-		uint8_t* _compressedImage = NULL;
-
-		tjCompress2(_jpegCompressor, src.data, src.width, src.stride, src.height, TJPF_RGB,
-			&_compressedImage, &_jpegSize, quality <= 90 ? TJSAMP_420 : TJSAMP_444, quality, TJFLAG_FASTDCT);
-
-		if (!name.empty())
-		{
-			FILE* file = fopen(name.c_str(), "wb");
-			if (!file)
-			{
-				std::cout << "Could not open JPEG file: " << std::endl;
-				return;
-			}
-			if (fwrite(_compressedImage, _jpegSize, 1, file) < 1)
-			{
-				std::cout << "Could not write JPEG file: " << std::endl;
-				return;
-			}
-			fclose(file);
-		}
-
-		if (*_compressedImage)
-			tjFree(_compressedImage);
-		else
-			std::cout << "TurboJpeg can't save image to memory!" << std::endl;
-	}
-
-	bool Test(const String & name, const int count, int quality, tjhandle jpegCompressor)
+	bool EncodeTest(const String& name, double minTime, int quality, FrameworkPtrs & frameworks)
 	{
 		Image src;
 		if (!src.Load(String("../data/image/") + name, Image::Rgb24))
@@ -85,24 +34,22 @@ namespace Test
 			return false;
 		}
 
-		std::cout << "Test (name = " << name << "\t, quality = " << quality << ") :";
+		std::cout << "Encode test (name = " << name << "\t, quality = " << quality << ") : " << std::flush;
 
-		int64_t startSimd = Cpl::TimeCounter();
-		for (int i = 0; i < count; ++i)
-			TestSimd(src, quality);
-		int64_t endSimd = Cpl::TimeCounter();
-		double timeSimd = Cpl::Miliseconds(endSimd - startSimd) / count;
-
-		int64_t startTj = Cpl::TimeCounter();
-		for (int i = 0; i < count; ++i)
-			TestTurboJpeg(jpegCompressor, src, quality, "");
-		int64_t endTj = Cpl::TimeCounter();
-		double timeTj = Cpl::Miliseconds(endTj - startTj) / count;
-
-		std::cout << std::setprecision(3) << std::fixed << "TurboJpeg : " << timeTj << ", Simd : " << timeSimd << " ms, TurboJpeg / Simd : " << timeTj / timeSimd << std::endl;
-
-		src.Save(std::string("simd_") + std::to_string(quality) + "_" + name, SimdImageFileJpeg, quality);
-		TestTurboJpeg(jpegCompressor, src, quality, String("tj_") + std::to_string(quality) + "_" + name);
+		for (size_t f = 0; f < frameworks.size(); ++f)
+		{
+			std::cout << frameworks[f]->Name() << " : " << std::flush;
+			int64_t start = Cpl::TimeCounter(), total = 0;
+			int64_t enough = int64_t(Cpl::TimeFrequency() * minTime);
+			int count = 0;
+			for (; total < enough; count++)
+			{
+				frameworks[f]->Save(src, quality);
+				total = Cpl::TimeCounter() - start;
+			}
+			std::cout << Cpl::ToStr(Cpl::Miliseconds(total) / count, 3) << " ms,   " << std::flush;
+		}
+		std::cout << std::endl << std::flush;
 
 		return true;
 	}
@@ -110,18 +57,20 @@ namespace Test
 
 int main()
 {
-	const int N = 100, qulities[5] = {10, 35, 65, 85, 95};
-	tjhandle jpegCompressor = tjInitCompress();
+	Test::FrameworkPtrs frameworks;
+	frameworks.push_back(Test::FrameworkPtr(Test::InitSimd()));
+	frameworks.push_back(Test::FrameworkPtr(Test::InitTurboJpeg()));
+	frameworks.push_back(Test::FrameworkPtr(Test::InitStb()));
 
-	for (int i = 0; i < 5; ++i)
-	{
-		Test::Test("city.jpg", N, qulities[i], jpegCompressor);
-		Test::Test("face.jpg", N, qulities[i], jpegCompressor);
-		Test::Test("forest.jpg", N, qulities[i], jpegCompressor);
-		Test::Test("text.png", N, qulities[i], jpegCompressor);
-	}
+	Test::Ints qulities = {10, 35, 65, 85, 95};
 
-	tjDestroy(jpegCompressor);
+	Test::Strings images = { "city.jpg", "face.jpg", "forest.jpg", "text.png" };
+
+	double minTime = 1.000;
+
+	for (size_t q = 0; q < qulities.size(); ++q)
+		for (size_t i = 0; i < images.size(); ++i)
+			Test::EncodeTest(images[i], minTime, qulities[q], frameworks);
 	
 	return 0;
 }

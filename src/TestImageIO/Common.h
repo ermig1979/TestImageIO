@@ -1,7 +1,7 @@
 /*
 * Test Image IO Project (http://github.com/ermig1979/TestImageIO).
 *
-* Copyright (c) 2021-2021 Yermalayeu Ihar.
+* Copyright (c) 2021-2022 Yermalayeu Ihar.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -25,11 +25,14 @@
 
 #include "Cpl/Performance.h"
 
-#include "Simd/SimdView.hpp"
+#include "Simd/SimdLib.hpp"
 
 namespace Test
 {
+	typedef Cpl::Ints Ints;
+
 	typedef Cpl::String String;
+	typedef Cpl::Strings Strings;
 
 	typedef Simd::View<Simd::Allocator> Image;
 
@@ -58,6 +61,14 @@ namespace Test
 
 		virtual bool Save(const Image& image, int quality, Compressed & compressed) = 0;
 
+		virtual bool Save(const Image& image, int quality)
+		{
+			Compressed compressed;
+			bool result = Save(image, quality, compressed);
+			Free(compressed);
+			return result;
+		};
+
 		virtual bool Load(const Compressed& compressed, Image& image) = 0;
 
 		virtual bool Load(const Compressed& compressed) = 0;
@@ -67,6 +78,14 @@ namespace Test
 
 	//------------------------------------------------------------------------------------------------
 
+	typedef std::shared_ptr<Framework> FrameworkPtr;
+	typedef std::vector<FrameworkPtr> FrameworkPtrs;
+
+	//------------------------------------------------------------------------------------------------
+
 	Framework* InitSimd();
+
+	Framework* InitStb();
+
 	Framework* InitTurboJpeg();
 }
