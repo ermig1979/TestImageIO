@@ -25,12 +25,13 @@
 
 namespace Test
 {
-	bool EncodeTest(const String& name, double minTime, int quality, FrameworkPtrs & frameworks)
+	bool EncodeTest(const Options & options, const String & name, int quality, FrameworkPtrs & frameworks)
 	{
+		const String& path = name;// Cpl::MakePath(options.imageDirectory, name);
 		Image src;
-		if (!src.Load(String("../data/image/") + name, Image::Rgb24))
+		if (!src.Load(path, Image::Rgb24))
 		{
-			std::cout << "Can't load test image!" << std::endl;
+			std::cout << "Can't load test image: " << path << " !" << std::endl;
 			return false;
 		}
 
@@ -40,7 +41,7 @@ namespace Test
 		{
 			std::cout << frameworks[f]->Name() << " : " << std::flush;
 			int64_t start = Cpl::TimeCounter(), total = 0;
-			int64_t enough = int64_t(Cpl::TimeFrequency() * minTime);
+			int64_t enough = int64_t(Cpl::TimeFrequency() * options.timeMin * 0.001);
 			int count = 0;
 			for (; total < enough; count++)
 			{
@@ -53,24 +54,55 @@ namespace Test
 
 		return true;
 	}
+
+	inline bool IsWanted(const Options& options, const String& path)
+	{
+		if (options.imageFilter.empty())
+			return true;
+		return path.find(options.imageFilter) != String::npos;
+	}
+
+	Strings FindImages(const Options& options)
+	{
+		Strings images;
+		fs::file_status status = fs::status(options.imageDirectory);
+		if (fs::is_directory(status))
+		{
+			for (fs::directory_iterator it(options.imageDirectory); it != fs::directory_iterator(); ++it)
+			{
+				if (it->is_regular_file() && IsWanted(options, it->path()))
+					images.push_back(it->path());
+			}
+		}
+		else
+		{
+			CPL_LOG_SS(Error, "Directory '" << options.imageDirectory << "' is not exist!");
+		}
+		return images;
+	}
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+	Test::Options options(argc, argv);
+
+	Cpl::Log::Global().AddStdWriter(options.logLevel);
+	Cpl::Log::Global().SetFlags(Cpl::Log::BashFlags);
+
 	Test::FrameworkPtrs frameworks;
 	frameworks.push_back(Test::FrameworkPtr(Test::InitSimd()));
 	frameworks.push_back(Test::FrameworkPtr(Test::InitTurboJpeg()));
 	frameworks.push_back(Test::FrameworkPtr(Test::InitStb()));
 
-	Test::Ints qulities = {10, 35, 65, 85, 95};
+	Test::Ints qualities = {10, 35, 65, 85, 95};
 
-	Test::Strings images = { "city.jpg", "face.jpg", "forest.jpg", "text.png" };
+	Test::Strings images = Test::FindImages(options);// { "city.jpg", "face.jpg", "forest.jpg", "text.png" };
 
 	double minTime = 1.000;
 
-	for (size_t q = 0; q < qulities.size(); ++q)
+	for (size_t q = 0; q < qualities.size(); ++q)
 		for (size_t i = 0; i < images.size(); ++i)
-			Test::EncodeTest(images[i], minTime, qulities[q], frameworks);
+			Test::EncodeTest(options, images[i], qualities[q], frameworks);
 	
 	return 0;
 }
